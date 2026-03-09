@@ -12,13 +12,13 @@ router.get('/:menuId', async (req, res) => {
     if (subMenuId) {
       // 获取指定子菜单的卡片
       result = await pool.query(
-        'SELECT id, menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, sort_order AS "order" FROM cards WHERE sub_menu_id = $1 ORDER BY "order"',
+        'SELECT id, menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, sort_order AS "order" FROM cards WHERE sub_menu_id = $1 ORDER BY "order"',
         [subMenuId]
       );
     } else {
       // 获取主菜单的卡片（不包含子菜单的卡片）
       result = await pool.query(
-        'SELECT id, menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, sort_order AS "order" FROM cards WHERE menu_id = $1 AND sub_menu_id IS NULL ORDER BY "order"',
+        'SELECT id, menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, sort_order AS "order" FROM cards WHERE menu_id = $1 AND sub_menu_id IS NULL ORDER BY "order"',
         [req.params.menuId]
       );
     }
@@ -41,10 +41,10 @@ router.get('/:menuId', async (req, res) => {
 // 新增、修改、删除卡片需认证
 router.post('/', auth, async (req, res) => {
   const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, order } = req.body;
-  
+
   try {
     const result = await pool.query(
-      'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+      'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
       [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, desc, order || 0]
     );
     res.json({ id: result.rows[0].id });
@@ -55,10 +55,10 @@ router.post('/', auth, async (req, res) => {
 
 router.put('/:id', auth, async (req, res) => {
   const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, order } = req.body;
-  
+
   try {
     const result = await pool.query(
-      'UPDATE cards SET menu_id=$1, sub_menu_id=$2, title=$3, url=$4, logo_url=$5, custom_logo_path=$6, desc=$7, sort_order=$8 WHERE id=$9',
+      'UPDATE cards SET menu_id=$1, sub_menu_id=$2, title=$3, url=$4, logo_url=$5, custom_logo_path=$6, description=$7, sort_order=$8 WHERE id=$9',
       [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, desc, order || 0, req.params.id]
     );
     res.json({ changed: result.rowCount });
