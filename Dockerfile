@@ -13,13 +13,9 @@ RUN npm run build
 # 生产环境
 FROM node:20-alpine3.20 AS production
 
-RUN apk add --no-cache \
-    sqlite \
-    && rm -rf /var/cache/apk/*
-
 WORKDIR /app
 
-RUN mkdir -p uploads database web/dist
+RUN mkdir -p uploads web/dist
 
 COPY package*.json ./
 
