@@ -8,5 +8,9 @@ module.exports = {
   server: {
     port: process.env.PORT || 3000,
     jwtSecret: process.env.JWT_SECRET || 'nav-item-jwt-secret-2024-secure-key'
+  },
+  database: {
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
   }
-}; 
+};
