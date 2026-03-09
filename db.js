@@ -40,7 +40,7 @@ async function createTables(client) {
       url TEXT NOT NULL,
       logo_url TEXT,
       custom_logo_path TEXT,
-      desc TEXT,
+      description TEXT,
       sort_order INTEGER DEFAULT 0,
       FOREIGN KEY(menu_id) REFERENCES menus(id) ON DELETE CASCADE,
       FOREIGN KEY(sub_menu_id) REFERENCES sub_menus(id) ON DELETE CASCADE
@@ -215,13 +215,13 @@ async function insertDefaultData(client) {
       const subMenuId = subMenuIds[`Ai Stuff_${card.subMenu}`] || subMenuIds[`Tools_${card.subMenu}`];
       if (subMenuId) {
         await client.query(
-          'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, desc) VALUES (NULL, $1, $2, $3, $4, $5)',
+          'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, description) VALUES (NULL, $1, $2, $3, $4, $5)',
           [subMenuId, card.title, card.url, card.logo_url, card.desc]
         );
       }
     } else if (menuIds[card.menu]) {
       await client.query(
-        'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, desc) VALUES ($1, NULL, $2, $3, $4, $5)',
+        'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, description) VALUES ($1, NULL, $2, $3, $4, $5)',
         [menuIds[card.menu], card.title, card.url, card.logo_url, card.desc]
       );
     }

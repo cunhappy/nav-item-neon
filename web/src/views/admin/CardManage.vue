@@ -40,7 +40,7 @@
             <td><input v-model="card.title" @blur="updateCard(card)" class="table-input" /></td>
             <td><input v-model="card.url" @blur="updateCard(card)" class="table-input" /></td>
             <td><input v-model="card.logo_url" @blur="updateCard(card)" class="table-input" placeholder="logo链接(可选)" /></td>
-            <td><input v-model="card.desc" @blur="updateCard(card)" class="table-input" placeholder="描述（可选）" /></td>
+            <td><input v-model="card.description" @blur="updateCard(card)" class="table-input" placeholder="描述（可选）" /></td>
             <td><input v-model.number="card.order" type="number" @blur="updateCard(card)" class="table-input order-input" /></td>
             <td>
               <button class="btn btn-danger btn-icon" @click="deleteCard(card.id)" title="删除">
@@ -133,7 +133,7 @@ async function updateCard(card) {
     title: card.title,
     url: card.url,
     logo_url: card.logo_url,
-    desc: card.desc,
+    desc: card.description,
     order: card.order
   });
   loadCards();

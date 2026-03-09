@@ -137,7 +137,7 @@ function onImgError(e, card) {
 
 function getTooltip(card) {
   let tip = '';
-  if (card.desc) tip += card.desc + '\n';
+  if (card.description) tip += card.description + '\n';
   tip += card.url;
   return tip;
 }
