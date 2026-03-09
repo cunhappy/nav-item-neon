@@ -40,12 +40,14 @@ router.get('/:menuId', async (req, res) => {
 
 // 新增、修改、删除卡片需认证
 router.post('/', auth, async (req, res) => {
-  const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, order } = req.body;
+  const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, order } = req.body;
+  // 兼容前端发送的 desc 字段
+  const cardDesc = description !== undefined ? description : req.body.desc;
 
   try {
     const result = await pool.query(
       'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-      [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, desc, order || 0]
+      [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, cardDesc, order || 0]
     );
     res.json({ id: result.rows[0].id });
   } catch (err) {
@@ -54,12 +56,14 @@ router.post('/', auth, async (req, res) => {
 });
 
 router.put('/:id', auth, async (req, res) => {
-  const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, desc, order } = req.body;
+  const { menu_id, sub_menu_id, title, url, logo_url, custom_logo_path, description, order } = req.body;
+  // 兼容前端发送的 desc 字段
+  const cardDesc = description !== undefined ? description : req.body.desc;
 
   try {
     const result = await pool.query(
       'UPDATE cards SET menu_id=$1, sub_menu_id=$2, title=$3, url=$4, logo_url=$5, custom_logo_path=$6, description=$7, sort_order=$8 WHERE id=$9',
-      [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, desc, order || 0, req.params.id]
+      [menu_id, sub_menu_id || null, title, url, logo_url, custom_logo_path, cardDesc, order || 0, req.params.id]
     );
     res.json({ changed: result.rowCount });
   } catch (err) {
