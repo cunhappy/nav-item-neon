@@ -1,114 +1,138 @@
 const express = require('express');
-const db = require('../db');
+const { pool } = require('../db');
 const auth = require('./authMiddleware');
 const router = express.Router();
 
 // 获取所有菜单（包含子菜单）
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { page, pageSize } = req.query;
+  
   if (!page && !pageSize) {
     // 获取主菜单
-    db.all('SELECT * FROM menus ORDER BY "order"', [], (err, menus) => {
-      if (err) return res.status(500).json({error: err.message});
+    try {
+      const menusResult = await pool.query('SELECT id, name, sort_order AS "order" FROM menus ORDER BY "order"');
+      const menus = menusResult.rows;
       
       // 为每个主菜单获取子菜单
-      const getSubMenus = (menu) => {
-        return new Promise((resolve, reject) => {
-          db.all('SELECT * FROM sub_menus WHERE parent_id = ? ORDER BY "order"', [menu.id], (err, subMenus) => {
-            if (err) reject(err);
-            else resolve(subMenus);
-          });
-        });
-      };
+      for (const menu of menus) {
+        const subMenusResult = await pool.query(
+          'SELECT id, parent_id, name, sort_order AS "order" FROM sub_menus WHERE parent_id = $1 ORDER BY "order"',
+          [menu.id]
+        );
+        menu.subMenus = subMenusResult.rows;
+      }
       
-      Promise.all(menus.map(async (menu) => {
-        try {
-          const subMenus = await getSubMenus(menu);
-          return { ...menu, subMenus };
-        } catch (err) {
-          console.error('获取子菜单失败:', err);
-          return { ...menu, subMenus: [] };
-        }
-      })).then(menusWithSubMenus => {
-        res.json(menusWithSubMenus);
-      }).catch(err => {
-        res.status(500).json({error: err.message});
-      });
-    });
+      res.json(menus);
+    } catch (err) {
+      res.status(500).json({error: err.message});
+    }
   } else {
     const pageNum = parseInt(page) || 1;
     const size = parseInt(pageSize) || 10;
     const offset = (pageNum - 1) * size;
-    db.get('SELECT COUNT(*) as total FROM menus', [], (err, countRow) => {
-      if (err) return res.status(500).json({error: err.message});
-      db.all('SELECT * FROM menus ORDER BY "order" LIMIT ? OFFSET ?', [size, offset], (err, rows) => {
-        if (err) return res.status(500).json({error: err.message});
-        res.json({
-          total: countRow.total,
-          page: pageNum,
-          pageSize: size,
-          data: rows
-        });
+    
+    try {
+      const countResult = await pool.query('SELECT COUNT(*) as total FROM menus');
+      const result = await pool.query(
+        'SELECT id, name, sort_order AS "order" FROM menus ORDER BY "order" LIMIT $1 OFFSET $2',
+        [size, offset]
+      );
+      
+      res.json({
+        total: parseInt(countResult.rows[0].total),
+        page: pageNum,
+        pageSize: size,
+        data: result.rows
       });
-    });
+    } catch (err) {
+      res.status(500).json({error: err.message});
+    }
   }
 });
 
 // 获取指定菜单的子菜单
-router.get('/:id/submenus', (req, res) => {
-  db.all('SELECT * FROM sub_menus WHERE parent_id = ? ORDER BY "order"', [req.params.id], (err, rows) => {
-    if (err) return res.status(500).json({error: err.message});
-    res.json(rows);
-  });
+router.get('/:id/submenus', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, parent_id, name, sort_order AS "order" FROM sub_menus WHERE parent_id = $1 ORDER BY "order"',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-// 新增、修改、删除菜单需认证
-router.post('/', auth, (req, res) => {
+// 新增菜单需认证
+router.post('/', auth, async (req, res) => {
   const { name, order } = req.body;
-  db.run('INSERT INTO menus (name, "order") VALUES (?, ?)', [name, order || 0], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ id: this.lastID });
-  });
+  try {
+    const result = await pool.query(
+      'INSERT INTO menus (name, sort_order) VALUES ($1, $2) RETURNING id',
+      [name, order || 0]
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-router.put('/:id', auth, (req, res) => {
+router.put('/:id', auth, async (req, res) => {
   const { name, order } = req.body;
-  db.run('UPDATE menus SET name=?, "order"=? WHERE id=?', [name, order || 0, req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ changed: this.changes });
-  });
+  try {
+    const result = await pool.query(
+      'UPDATE menus SET name=$1, sort_order=$2 WHERE id=$3',
+      [name, order || 0, req.params.id]
+    );
+    res.json({ changed: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-router.delete('/:id', auth, (req, res) => {
-  db.run('DELETE FROM menus WHERE id=?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ deleted: this.changes });
-  });
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM menus WHERE id=$1', [req.params.id]);
+    res.json({ deleted: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
 // 子菜单相关API
-router.post('/:id/submenus', auth, (req, res) => {
+router.post('/:id/submenus', auth, async (req, res) => {
   const { name, order } = req.body;
-  db.run('INSERT INTO sub_menus (parent_id, name, "order") VALUES (?, ?, ?)', 
-    [req.params.id, name, order || 0], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ id: this.lastID });
-  });
+  try {
+    const result = await pool.query(
+      'INSERT INTO sub_menus (parent_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id',
+      [req.params.id, name, order || 0]
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-router.put('/submenus/:id', auth, (req, res) => {
+router.put('/submenus/:id', auth, async (req, res) => {
   const { name, order } = req.body;
-  db.run('UPDATE sub_menus SET name=?, "order"=? WHERE id=?', [name, order || 0, req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ changed: this.changes });
-  });
+  try {
+    const result = await pool.query(
+      'UPDATE sub_menus SET name=$1, sort_order=$2 WHERE id=$3',
+      [name, order || 0, req.params.id]
+    );
+    res.json({ changed: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-router.delete('/submenus/:id', auth, (req, res) => {
-  db.run('DELETE FROM sub_menus WHERE id=?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ deleted: this.changes });
-  });
+router.delete('/submenus/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM sub_menus WHERE id=$1', [req.params.id]);
+    res.json({ deleted: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-module.exports = router; 
+module.exports = router;

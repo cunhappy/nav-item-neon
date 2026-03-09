@@ -10,8 +10,9 @@ const adRoutes = require('./routes/ad');
 const friendRoutes = require('./routes/friend');
 const userRoutes = require('./routes/user');
 const compression = require('compression');
-const app = express();
+const { initDatabase } = require('./db');
 
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -41,6 +42,14 @@ app.use('/api/ads', adRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/users', userRoutes);
 
-app.listen(PORT, () => {
-  console.log(`server is running at http://localhost:${PORT}`);
-}); 
+// 启动前先初始化数据库
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Database init failed:', err);
+    process.exit(1);
+  });

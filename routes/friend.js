@@ -1,56 +1,78 @@
 const express = require('express');
-const db = require('../db');
+const { pool } = require('../db');
 const auth = require('./authMiddleware');
 const router = express.Router();
 
 // 获取友链
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { page, pageSize } = req.query;
+  
   if (!page && !pageSize) {
-    db.all('SELECT * FROM friends', [], (err, rows) => {
-      if (err) return res.status(500).json({error: err.message});
-      res.json(rows);
-    });
+    try {
+      const result = await pool.query('SELECT * FROM friends');
+      res.json(result.rows);
+    } catch (err) {
+      res.status(500).json({error: err.message});
+    }
   } else {
     const pageNum = parseInt(page) || 1;
     const size = parseInt(pageSize) || 10;
     const offset = (pageNum - 1) * size;
-    db.get('SELECT COUNT(*) as total FROM friends', [], (err, countRow) => {
-      if (err) return res.status(500).json({error: err.message});
-      db.all('SELECT * FROM friends LIMIT ? OFFSET ?', [size, offset], (err, rows) => {
-        if (err) return res.status(500).json({error: err.message});
-        res.json({
-          total: countRow.total,
-          page: pageNum,
-          pageSize: size,
-          data: rows
-        });
+    
+    try {
+      const countResult = await pool.query('SELECT COUNT(*) as total FROM friends');
+      const result = await pool.query('SELECT * FROM friends LIMIT $1 OFFSET $2', [size, offset]);
+      
+      res.json({
+        total: parseInt(countResult.rows[0].total),
+        page: pageNum,
+        pageSize: size,
+        data: result.rows
       });
-    });
+    } catch (err) {
+      res.status(500).json({error: err.message});
+    }
   }
 });
+
 // 新增友链
-router.post('/', auth, (req, res) => {
+router.post('/', auth, async (req, res) => {
   const { title, url, logo } = req.body;
-  db.run('INSERT INTO friends (title, url, logo) VALUES (?, ?, ?)', [title, url, logo], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ id: this.lastID });
-  });
-});
-// 修改友链
-router.put('/:id', auth, (req, res) => {
-  const { title, url, logo } = req.body;
-  db.run('UPDATE friends SET title=?, url=?, logo=? WHERE id=?', [title, url, logo, req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ changed: this.changes });
-  });
-});
-// 删除友链
-router.delete('/:id', auth, (req, res) => {
-  db.run('DELETE FROM friends WHERE id=?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.json({ deleted: this.changes });
-  });
+  
+  try {
+    const result = await pool.query(
+      'INSERT INTO friends (title, url, logo) VALUES ($1, $2, $3) RETURNING id',
+      [title, url, logo]
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
 });
 
-module.exports = router; 
+// 修改友链
+router.put('/:id', auth, async (req, res) => {
+  const { title, url, logo } = req.body;
+  
+  try {
+    const result = await pool.query(
+      'UPDATE friends SET title=$1, url=$2, logo=$3 WHERE id=$4',
+      [title, url, logo, req.params.id]
+    );
+    res.json({ changed: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
+});
+
+// 删除友链
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM friends WHERE id=$1', [req.params.id]);
+    res.json({ deleted: result.rowCount });
+  } catch (err) {
+    res.status(500).json({error: err.message});
+  }
+});
+
+module.exports = router;
