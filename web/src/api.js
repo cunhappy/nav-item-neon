@@ -1,4 +1,16 @@
 import axios from 'axios';
+
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/admin';
+    }
+    return Promise.reject(error);
+  }
+);
+
 const BASE = '/api';
 
 export const login = (username, password) => axios.post(`${BASE}/login`, { username, password });
